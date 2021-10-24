@@ -34,6 +34,9 @@
     let engine;
     let engineMovement;
     let isTweening = false;
+    let blink1;
+    let blink2;
+    let blink3;
 
     async function start() {
         // Init
@@ -86,7 +89,7 @@
         scene.add( new THREE.AmbientLight( 0xffffff, 0.4 ) );
 
         // Irányfény
-        prepareDirectionalLight(scene, grassMesh);
+        prepareSunLight(scene, grassMesh);
 
         // Az ablak későbbi átméretezése esetén visszahívható függvény megadása
         window.addEventListener( 'resize', handleWindowResize, false );
@@ -99,6 +102,11 @@
                 takeStepRight(scene.getObjectByName('engine'), 0, 10, 2000);
             }
         };
+
+        blink1 = blinking(scene.getObjectByName('lamp1')).start();
+        blink2 = blinking(scene.getObjectByName('lamp2')).delay(1500).start();
+        blink3 = blinking(scene.getObjectByName('lamp3')).start();
+
 
         // add extras
         addControlGui(control);
@@ -123,11 +131,22 @@
 
         requestAnimationFrame( animate );
 
-        TWEEN.update();
-
         if(engineMovement){
             engine.position.x += engineMovement
         }
+        if(engine.position.x > -10){
+            TWEEN.removeAll();
+            scene.getObjectByName('lamp2').intensity = 0;
+            scene.getObjectByName('lamp3').intensity = 0;
+            TWEEN.add(blink1);
+        } else {
+            TWEEN.removeAll();
+            scene.getObjectByName('lamp1').intensity = 0;
+            TWEEN.add(blink2);
+            TWEEN.add(blink3);
+        }
+        TWEEN.update();
+
 
         controls.update();
         // Új képkocka rajzolása
@@ -281,9 +300,9 @@
        // Lámpa üveg
        // Másolva THREE.js fórum: MrMateo07 felhasználótól
        const buildLampGlass = buildLampMesh(lampHeadGroup);
-       buildLampGlass([0,5,1], [10, -3, 7], 0xffffff);
-       buildLampGlass([1.5, 7, 1], [11.5,-1,7], 0xff0000);
-       buildLampGlass([-1.5, 7, 1], [8.5,-1,7], 0xff0000);
+       buildLampGlass([0,5,1], [10, -3, 7], 0xffffff, 'lamp1');
+       buildLampGlass([1.5, 7, 1], [11.5,-1,7], 0xff0000, 'lamp2');
+       buildLampGlass([-1.5, 7, 1], [8.5,-1,7], 0xff0000, 'lamp3');
 
        // Befejező lépés
        lampGroup.add(lampHeadGroup);
@@ -291,7 +310,7 @@
        scene.add(lampGroup);
    }
 
-   const buildLampMesh = (group) => ([x,y,z], [lx, ly, lz], color) => {
+   const buildLampMesh = (group) => ([x,y,z], [lx, ly, lz], color, name) => {
        const lampGlassGeometry = new THREE.SphereGeometry(1, 32, 32, 0, 3.14);
        const lampGlassMaterial = new THREE.MeshPhysicalMaterial({
            metalness: .9,
@@ -311,27 +330,34 @@
        lampGlassMesh.position.set(x,y,z);
        group.add(lampGlassMesh);
 
-       const lampLight = new THREE.PointLight( 0xffffff, 0.5, 1000, THREE.MathUtils.degToRad(180) );
-       lampLight.castShadow = true;
-       lampLight.position.set(lx, ly, lz);
-       group.add( lampLight );
+       var boxGeometry = new THREE.BoxGeometry( 6, 6, 6 );
+       var boxMaterial = new THREE.MeshBasicMaterial( { color: 0xffffff } );
+       var boxMesh = new THREE.Mesh( boxGeometry, boxMaterial );
+       boxMesh.position.set(-lx,ly+16, 50);
+       scene.add( boxMesh );
 
-       const sphereSize = 0.2;
-       const pointLight1Helper = new THREE.PointLightHelper( lampLight, sphereSize );
-       group.add( pointLight1Helper );
+       const lampLight = new THREE.SpotLight( color, 0, 0, THREE.MathUtils.degToRad(60) );
+       lampLight.castShadow = true;
+       lampLight.target = boxMesh;
+       lampLight.position.set(-lx, ly+16, lz-11.5);
+       lampLight.name = name;
+       scene.add( lampLight );
+
+       const spotLightHelper = new THREE.SpotLightHelper( lampLight );
+       scene.add( spotLightHelper );
    }
 
     // Irányfény készítése
-    function prepareDirectionalLight(scene, target) {
+    function prepareSunLight(scene, target) {
         const sLight = new THREE.SpotLight( 0xffffff, 1 );
         sLight.position.set( 60, 60, 60 );
         sLight.target = target;
         sLight.castShadow = true;
-        scene.add( sLight );
+        //scene.add( sLight );
 
         const planeSize = 1.0;
         const sLightHelper = new THREE.SpotLightHelper( sLight, planeSize );
-        scene.add( sLightHelper );
+        //scene.add( sLightHelper );
     }
 
 
@@ -374,7 +400,7 @@
         gui.add(controlObject, 'right').name('Jobbra');
     }
 
-    // TWEEN Animation
+    // TWEEN moving animation Animation
     function takeStepRight(object, start, end, time) {
         if (!isTweening) {
             new TWEEN.Tween(object.position)
@@ -415,6 +441,29 @@
                 })
                 .start();
         }
+    }
+
+    // TWEEN blinking animation
+    function blinking(object){
+        const weaker = new TWEEN.Tween(object)
+            .to({intensity: 0}, 1500).easing(TWEEN.Easing.Quadratic.InOut)
+            .onStart(function () {
+                object.intensity = 1;
+            })
+            .onComplete(function (){
+                object.intensity = 0;
+            });
+        const stronger = new TWEEN.Tween(object)
+            .to({intensity: 1}, 1500).easing(TWEEN.Easing.Quadratic.InOut)
+            .onStart(function () {
+                object.intensity = 0;
+            })
+            .onComplete(function (){
+                object.intensity = 1;
+        }).chain(weaker);
+        weaker.chain(stronger);
+        return stronger;
+
     }
 
 </script>
