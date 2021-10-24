@@ -317,9 +317,9 @@
        lampGlassMesh.position.set(x,y,z);
        group.add(lampGlassMesh);
 
-       var boxGeometry = new THREE.BoxGeometry( 6, 6, 6 );
-       var boxMaterial = new THREE.MeshBasicMaterial( { color: 0x000000 } );
-       var boxMesh = new THREE.Mesh( boxGeometry, boxMaterial );
+       const boxGeometry = new THREE.BoxGeometry( 6, 6, 6 );
+       const boxMaterial = new THREE.MeshBasicMaterial( { color: 0x000000 } );
+       const boxMesh = new THREE.Mesh( boxGeometry, boxMaterial );
        boxMesh.position.set(-lx,ly+16, 50);
        scene.add( boxMesh );
 
