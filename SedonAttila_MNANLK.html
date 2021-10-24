@@ -94,22 +94,9 @@
         // Az ablak későbbi átméretezése esetén visszahívható függvény megadása
         window.addEventListener( 'resize', handleWindowResize, false );
 
-        control = {
-            left: function () {
-                takeStepLeft(scene.getObjectByName('engine'), 0, -20, 2000);
-            },
-            right: function () {
-                takeStepRight(scene.getObjectByName('engine'), 0, 10, 2000);
-            }
-        };
-
         blink1 = blinking(scene.getObjectByName('lamp1')).start();
         blink2 = blinking(scene.getObjectByName('lamp2')).delay(1500).start();
         blink3 = blinking(scene.getObjectByName('lamp3')).start();
-
-
-        // add extras
-        addControlGui(control);
 
         controls = new TrackballControls( camera, renderer.domElement );
         controls.rotateSpeed = 5.0;
@@ -331,7 +318,7 @@
        group.add(lampGlassMesh);
 
        var boxGeometry = new THREE.BoxGeometry( 6, 6, 6 );
-       var boxMaterial = new THREE.MeshBasicMaterial( { color: 0xffffff } );
+       var boxMaterial = new THREE.MeshBasicMaterial( { color: 0x000000 } );
        var boxMesh = new THREE.Mesh( boxGeometry, boxMaterial );
        boxMesh.position.set(-lx,ly+16, 50);
        scene.add( boxMesh );
@@ -342,9 +329,6 @@
        lampLight.position.set(-lx, ly+16, lz-11.5);
        lampLight.name = name;
        scene.add( lampLight );
-
-       const spotLightHelper = new THREE.SpotLightHelper( lampLight );
-       scene.add( spotLightHelper );
    }
 
     // Irányfény készítése
@@ -353,11 +337,11 @@
         sLight.position.set( 60, 60, 60 );
         sLight.target = target;
         sLight.castShadow = true;
-        //scene.add( sLight );
+        scene.add( sLight );
 
         const planeSize = 1.0;
         const sLightHelper = new THREE.SpotLightHelper( sLight, planeSize );
-        //scene.add( sLightHelper );
+        scene.add( sLightHelper );
     }
 
 
@@ -391,56 +375,6 @@
         return new Promise((resolve, reject) => {
             new THREE.TextureLoader().load(url, resolve, null, reject );
         })
-    }
-
-    // Add control GUI
-    function addControlGui(controlObject) {
-        const gui = new GUI();
-        gui.add(controlObject, 'left').name('Balra');
-        gui.add(controlObject, 'right').name('Jobbra');
-    }
-
-    // TWEEN moving animation Animation
-    function takeStepRight(object, start, end, time) {
-        if (!isTweening) {
-            new TWEEN.Tween(object.position)
-                .to({ x: end }, time )
-                .easing(TWEEN.Easing.Quadratic.InOut)
-                .onStart(function () {
-                    isTweening = true;
-                    object.position.x = start;
-                })
-                .onUpdate(function() {
-                    console.log(object.position.x);
-                })
-                .onComplete(function () {
-                    // A végső eltolási értékek alkalmazása
-                    object.updateMatrix();
-                    isTweening = false;
-                })
-                .start();
-        }
-    }
-
-    function takeStepLeft(object, start, end, time) {
-        if (!isTweening) {
-            new TWEEN.Tween(object.position)
-                .to({ x: end }, time )
-                .easing(TWEEN.Easing.Quadratic.InOut)
-                .onStart(function () {
-                    isTweening = true;
-                    object.position.x = start;
-                })
-                .onUpdate(function() {
-                    console.log(object.position.x);
-                })
-                .onComplete(function () {
-                    // A végső eltolási értékek alkalmazása
-                    object.updateMatrix();
-                    isTweening = false;
-                })
-                .start();
-        }
     }
 
     // TWEEN blinking animation
