@@ -7,11 +7,37 @@
     <style>
         body { margin: 0; overflow: hidden; }
         canvas { width: 100%; height: 100% }
+        #info-panel {
+            display: flex;
+            justify-content: space-between;
+        }
+        .info-block {
+            width: 400px;
+        }
+        .left {
+            display: flex;
+            flex-direction: column;
+            align-items: end;
+        }
     </style>
 </head>
-
+<div id="info-panel">
+    <div class="info-block">
+        <div>Sedon Attila</div>
+        <div>MNANLK</div>
+        <div>Programtervező Informatikus</div>
+        <div>BSc. Levelező, 2021/2022</div></div>
+    <div class="info-block left">
+        <div><b>i</b>: információ ki-bekapcsolása</div>
+        <div><b>n</b>: éjszaka/nappal váltás</div>
+        <div><b>o</b>: "nap/hold" ki-bekapcsolása</div>
+        <div><b>a</b>: ambiens fény ki-bekapcsolása</div>
+        <div><b>Balra nyíl</b>: előre mozog a mozdony</div>
+        <div><b>Jobbra nyíl</b>: hátra mozog a mozdony</div>
+        <div><b>Le nyíl</b>: megáll a mozdony</div>
+    </div>
+</div>
 <body>
-
 
 <script type="module">
     import * as THREE from "./js-r132/build/three.module.js";
@@ -27,13 +53,17 @@
     const railroadMtl = 'sin.mtl';
 
     let WIDTH, HEIGHT, aspectRatio;
+
     let renderer;
     let controls;
-    let control;
     let scene, camera;
+
+    let sunLight, ambLight;
+
     let engine;
     let engineMovement;
-    let isTweening = false;
+
+    let isWhite;
     let blink1;
     let blink2;
     let blink3;
@@ -76,7 +106,7 @@
         await buildRailroad(scene);
 
         // Mozdony
-        buildEngine(scene);
+        await buildEngine(scene);
 
         // Lámpa
         buildLamp(scene);
@@ -85,18 +115,17 @@
         const grassMesh = await buildGrass();
         scene.add( grassMesh );
 
-        // Ambiens fény
-        scene.add( new THREE.AmbientLight( 0xffffff, 0.4 ) );
-
-        // Irányfény
-        prepareSunLight(scene, grassMesh);
+        const sign = await loadMaterialAndObject('kalauz_tabla.obj', 'kalauz_tabla.mtl');
+        scene.add(sign);
+        // Fények
+        prepareLights(scene, grassMesh);
 
         // Az ablak későbbi átméretezése esetén visszahívható függvény megadása
         window.addEventListener( 'resize', handleWindowResize, false );
 
         blink1 = blinking(scene.getObjectByName('lamp1')).start();
-        blink2 = blinking(scene.getObjectByName('lamp2')).delay(1500).start();
-        blink3 = blinking(scene.getObjectByName('lamp3')).start();
+        blink2 = blinking(scene.getObjectByName('lamp2')).start();
+        blink3 = blinking(scene.getObjectByName('lamp3')).delay(1500).start();
 
         controls = new TrackballControls( camera, renderer.domElement );
         controls.rotateSpeed = 5.0;
@@ -121,12 +150,14 @@
         if(engineMovement){
             engine.position.x += engineMovement
         }
-        if(engine.position.x > -10){
+        if(engine.position.x > -10 && !isWhite){
+            isWhite = true;
             TWEEN.removeAll();
             scene.getObjectByName('lamp2').intensity = 0;
             scene.getObjectByName('lamp3').intensity = 0;
             TWEEN.add(blink1);
-        } else {
+        } else if(engine.position.x <= -10 && isWhite) {
+            isWhite = false;
             TWEEN.removeAll();
             scene.getObjectByName('lamp1').intensity = 0;
             TWEEN.add(blink2);
@@ -177,7 +208,7 @@
     }
 
     //Mozdony készítése
-    function buildEngine(scene) {
+    async function buildEngine(scene) {
         // Engine Group
 
         const engineGroup = new THREE.Object3D();
@@ -209,8 +240,9 @@
         boxMesh.receiveShadow = true;
         engineGroup.add( boxMesh );
 
+        const texture = await loadTexture('frosted-glass-texture.jpg').then((texture => texture));
         const pilotGeometry = new THREE.BoxGeometry( 6, 6, 6 );
-        const pilotMaterial = new THREE.MeshPhongMaterial( { color: 0x0000ff } );
+        const pilotMaterial = new THREE.MeshPhongMaterial( { map:texture} );
         const pilotMesh = new THREE.Mesh( pilotGeometry, pilotMaterial );
         pilotMesh.position.x = 13;
         pilotMesh.position.y = 12;
@@ -226,13 +258,15 @@
         chimneyMesh.receiveShadow = true;
         engineGroup.add( chimneyMesh );
 
-        var coneGeometry = new THREE.ConeGeometry( 2, 2, 32 );
-        var coneMaterial = new THREE.MeshPhongMaterial( { color: 0xff0000, } );
-        var coneMesh = new THREE.Mesh( coneGeometry, coneMaterial );
+        const coneGeometry = new THREE.ConeGeometry( 2, 2, 32 );
+        const coneMaterial = new THREE.MeshPhongMaterial( { color: 0xff0000, } );
+        const coneMesh = new THREE.Mesh( coneGeometry, coneMaterial );
         coneMesh.position.y = 13;
         coneMesh.castShadow = true;
         coneMesh.receiveShadow = true;
         engineGroup.add( coneMesh );
+
+
 
         document.addEventListener('keydown', function (event){
             if (event.key === "ArrowLeft") {
@@ -317,7 +351,7 @@
        lampGlassMesh.position.set(x,y,z);
        group.add(lampGlassMesh);
 
-       const boxGeometry = new THREE.BoxGeometry( 6, 6, 6 );
+       const boxGeometry = new THREE.BoxGeometry( 1, 1, 1 );
        const boxMaterial = new THREE.MeshBasicMaterial( { color: 0x000000 } );
        const boxMesh = new THREE.Mesh( boxGeometry, boxMaterial );
        boxMesh.position.set(-lx,ly+16, 50);
@@ -331,8 +365,11 @@
        scene.add( lampLight );
    }
 
-    // Irányfény készítése
-    function prepareSunLight(scene, target) {
+    // Fények készítése
+    function prepareLights(scene, target) {
+        const aLight = new THREE.AmbientLight( 0xffffff, 0.4 );
+        scene.add(aLight);
+
         const sLight = new THREE.SpotLight( 0xffffff, 1 );
         sLight.position.set( 60, 60, 60 );
         sLight.target = target;
@@ -342,6 +379,35 @@
         const planeSize = 1.0;
         const sLightHelper = new THREE.SpotLightHelper( sLight, planeSize );
         scene.add( sLightHelper );
+
+        let isNightTime = false;
+        document.addEventListener('keydown', function (event){
+            if(event.key === "n"){
+                if(isNightTime){
+                    isNightTime = false;
+                    aLight.intensity = 0.4;
+                    sLight.intensity = 1;
+                } else {
+                    isNightTime = true;
+                    aLight.intensity = 0.1;
+                    sLight.intensity = 0.4;
+                }
+            }
+            if(event.key === "o"){
+                if (sLight.intensity > 0){
+                    sLight.intensity = 0;
+                } else {
+                    sLight.intensity = 1;
+                }
+            }
+            if(event.key === "a"){
+                if(aLight.intensity > 0){
+                    aLight.intensity = 0;
+                } else {
+                    aLight.intensity = 0.4;
+                }
+            }
+        });
     }
 
 
@@ -377,28 +443,31 @@
         })
     }
 
-    // TWEEN blinking animation
+    // TWEEN pislogó fény
     function blinking(object){
-        const weaker = new TWEEN.Tween(object)
-            .to({intensity: 0}, 1500).easing(TWEEN.Easing.Quadratic.InOut)
-            .onStart(function () {
-                object.intensity = 1;
-            })
-            .onComplete(function (){
-                object.intensity = 0;
-            });
-        const stronger = new TWEEN.Tween(object)
+        return new TWEEN.Tween(object)
             .to({intensity: 1}, 1500).easing(TWEEN.Easing.Quadratic.InOut)
             .onStart(function () {
                 object.intensity = 0;
             })
             .onComplete(function (){
                 object.intensity = 1;
-        }).chain(weaker);
-        weaker.chain(stronger);
-        return stronger;
-
+        }).yoyo(true).repeat(Infinity);;
     }
+
+    // Infó panel ki-be kapcsolgatás
+    document.addEventListener('keydown', function (event) {
+        const infoPanel = document.getElementById("info-panel");
+        if(event.key === "i"){
+            if(infoPanel.style.display !== "none"){
+                infoPanel.style.display = "none";
+            } else {
+                infoPanel.style.display = "flex";
+            }
+        }
+    });
+
+
 
 </script>
 </body>
